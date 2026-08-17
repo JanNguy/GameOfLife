@@ -19,14 +19,25 @@ data_part/ ──► ml_part/ ──► game/ ──► serveur/ ──► Clien
 ## Quickstart
 
 ```bash
-# Terminal 1 — run the full pipeline (non-blocking: data → ml → agents)
+# One-time bootstrap: creates/refreshes the shared Python 3.11 virtualenv
+make setup
+
+# One-time bootstrap for the React client
+cd Client && pnpm install
+```
+
+```bash
+# Optional: enable cloud question generation through Ollama.
+cp serveur/.env.example serveur/.env
+# Then set OLLAMA_KEY in serveur/.env (never commit this file).
+```
+
+```bash
+# Terminal 1 — run the full pipeline (data → ml → agents)
 make all
 
-# Terminal 2 — start the FastAPI backend (blocks)
-make serveur
-
-# Terminal 3 — start the Vite dev server (blocks)
-make client
+# Terminal 2 — start FastAPI and Vite together (blocks)
+make dev
 ```
 
 ## Components
@@ -67,6 +78,8 @@ python game.py --n 10 --seed 0 --out agents.json
 ### serveur — Backend API
 
 FastAPI server that streams pipeline command output to the frontend via SSE.
+It reads the optional Ollama configuration from `serveur/.env`; without `OLLAMA_KEY`,
+the simulation uses its local question generator.
 
 | Endpoint | Action |
 |---|---|
@@ -116,6 +129,6 @@ The project uses the [UCI Adult Income dataset](https://archive.ics.uci.edu/data
 
 ## Requirements
 
-- Python 3.10+ (3.11 for ml_part)
+- Python 3.11
 - Node.js + pnpm
-- See `requirements.txt` in each Python subdirectory
+- One shared virtual environment lives at `./.venv`

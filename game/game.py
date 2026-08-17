@@ -1,14 +1,19 @@
 """
 game/game.py
-Samples N initial agents from out_profiles.csv.
+Samples N initial agents from out_profiles.csv and runs a binary decision simulation for the current scenario.
 """
 import argparse
 import json
 import random
 from pathlib import Path
+
 import pandas as pd
 
+from scenario_orchestrator import call_orchestrator_llm
+from decision_engine import simulate_round, supervisor_summary
+
 ROOT = Path(__file__).resolve().parent.parent
+
 
 def generate_agents(n: int, seed: int = 42) -> list[dict]:
     random.seed(seed)
@@ -33,17 +38,35 @@ def generate_agents(n: int, seed: int = 42) -> list[dict]:
         })
     return agents
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n",    type=int, default=5)
+    parser.add_argument("--n", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--out",  default=str(ROOT / "game" / "agents.json"))
+    parser.add_argument("--scenario", default="default scenario")
+    parser.add_argument("--out", default=str(ROOT / "game" / "agents.json"))
     args = parser.parse_args()
 
     agents = generate_agents(args.n, args.seed)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(agents, f, indent=2, ensure_ascii=False)
+
+    print(f"scenario: {args.scenario}")
     print(f"{len(agents)} agents générés → {args.out}")
     for a in agents:
         print(f"  {a['agent_id']} | {a['race']}, {a['age']} ans, {a['education']}, {a['occupation']}")
+
+    questions = call_orchestrator_llm(args.scenario, max_questions=4)
+    print("\nQuestions proposées:")
+    for q in questions:
+        print(f"  - {q['id']}: {q['question']}")
+
+    decision_ids = [q["id"] for q in questions if q.get("type") == "binary"]
+    if not decision_ids:
+        decision_ids = ["employment", "housing", "relationship", "investment"]
+
+    decisions, summary = simulate_round(agents, decision_names=decision_ids)
+    print("\nSynthèse superviseur:")
+    print(supervisor_summary(decisions))
+    print(f"\nTaux global d'acceptation: {summary.acceptance_rate:.2%}")

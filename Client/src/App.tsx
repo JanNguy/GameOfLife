@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import type { KeyboardEvent } from 'react'
 import './App.css'
 
 type LineType = 'command' | 'output' | 'error' | 'info'
@@ -8,13 +9,14 @@ interface Line {
   type: LineType
 }
 
-const REMOTE_COMMANDS = ['run', 'clean', 'fclean', 'data', 'setup']
+const REMOTE_COMMANDS = ['run', 'clean', 'fclean', 'data', 'setup', 'model']
 
 const HELP_LINES: Line[] = [
   { text: 'available commands:', type: 'info' },
   { text: '  setup   — run the data pipeline', type: 'info' },
-  { text: '  run     — sample agents from profiles', type: 'info' },
+  { text: '  run     — sample agents: run <nb_agent> <scenario>', type: 'info' },
   { text: '  data    — rerun the data pipeline', type: 'info' },
+  { text: '  model   — show / select the prediction model', type: 'info' },
   { text: '  clean   — remove generated game files', type: 'info' },
   { text: '  fclean  — clean the entire project', type: 'info' },
   { text: '  clear   — clear the terminal', type: 'info' },
@@ -56,13 +58,19 @@ function App() {
       return
     }
 
-    if (!REMOTE_COMMANDS.includes(cmd)) {
+    const parts = cmd.split(/\s+/)
+    const baseCmd = parts[0]
+
+    if (!REMOTE_COMMANDS.includes(baseCmd)) {
       append(`unknown command: '${cmd}'. Type 'help'.`, 'error')
       return
     }
 
     setRunning(true)
-    const es = new EventSource(`/exec/${cmd}`)
+    const url = parts.length > 1
+      ? `/exec/${baseCmd}/${parts.slice(1).join('/')}`
+      : `/exec/${baseCmd}`
+    const es = new EventSource(url)
 
     es.onmessage = (e: MessageEvent<string>) => {
       if (e.data === '__END__') {
