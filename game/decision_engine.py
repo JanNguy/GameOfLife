@@ -43,6 +43,25 @@ class SimulationSummary:
     supervisor_note: str
 
 
+@dataclass
+class StoryOutcome:
+    agent_id: str
+    wealth: float
+    stability: float
+    survived: bool
+    timeline: list[str]
+
+
+@dataclass
+class StorySimulation:
+    scenario_kind: str
+    chapters: list[str]
+    outcomes: list[StoryOutcome]
+    ranking: list[StoryOutcome]
+    survivor_count: int
+    casualty_count: int
+
+
 def _as_float(value):
     try:
         return float(value)
@@ -198,3 +217,178 @@ def supervisor_summary(decisions: Iterable[AgentDecision]) -> str:
         f"- décision la plus sûre: {most_confident.decision} ({most_confident.confidence:.2f})"
     )
     return "\n".join(summary_lines)
+
+
+def _scenario_kind(scenario: str) -> str:
+    normalized = scenario.lower()
+    if any(term in normalized for term in ("fin du monde", "apocalypse", "nuclé", "nucle", "météor", "meteor", "extinction", "zombie")):
+        return "apocalypse"
+    if any(term in normalized for term in ("bours", "krach", "crash", "marché", "marche financier", "finance")):
+        return "market_crash"
+    if any(term in normalized for term in ("eau", "inond", "sécher", "secher", "pluie")):
+        return "water_crisis"
+    return "general_crisis"
+
+
+def _initial_wealth(agent: dict) -> float:
+    capital_gain = _as_float(agent.get("capital_gain_mean", 0))
+    income_rate = _as_float(agent.get("income_rate", 0))
+    education = str(agent.get("education", "")).lower()
+    education_bonus = 8000 if any(level in education for level in ("bachelors", "masters", "doctorate")) else 2500
+    return round(max(1500, 6000 + capital_gain * 4 + income_rate * 18000 + education_bonus), 2)
+
+
+def _decision_lookup(decisions: Iterable[AgentDecision]) -> dict[str, dict[str, AgentDecision]]:
+    grouped: dict[str, dict[str, AgentDecision]] = {}
+    for decision in decisions:
+        grouped.setdefault(decision.agent_id, {})[decision.decision] = decision
+    return grouped
+
+
+def simulate_story(agents: Iterable[dict], scenario: str, questions: Iterable[dict]) -> StorySimulation:
+    """Run a multi-step simulation and keep a readable branch for each agent."""
+    agent_list = list(agents)
+    question_list = list(questions)
+    decision_names = [question["id"] for question in question_list if question.get("type") == "binary"]
+    decisions, _ = simulate_round(agent_list, decision_names or list(DECISION_TYPES))
+    by_agent = _decision_lookup(decisions)
+    scenario_kind = _scenario_kind(scenario)
+
+    chapters_by_kind = {
+        "apocalypse": [
+            "Acte I - Les infrastructures s'effondrent et les ressources deviennent rares.",
+            "Acte II - Les agents doivent sécuriser un abri, des réserves ou une nouvelle source de revenus.",
+            "Acte III - La crise se prolonge : seuls les agents assez stables et équipés restent en vie.",
+        ],
+        "market_crash": [
+            "Acte I - Le marché perd brutalement de sa valeur.",
+            "Acte II - Les agents choisissent entre protéger leur épargne et saisir les actifs dépréciés.",
+            "Acte III - L'économie se stabilise et les trajectoires financières sont comparées.",
+        ],
+        "water_crisis": [
+            "Acte I - La ressource en eau devient rare et les infrastructures sont sous pression.",
+            "Acte II - Les agents choisissent de sécuriser leurs ressources ou de changer de zone.",
+            "Acte III - La communauté s'adapte et les trajectoires sont comparées.",
+        ],
+        "general_crisis": [
+            "Acte I - Un choc transforme les conditions de vie des agents.",
+            "Acte II - Chaque agent arbitre entre protection, adaptation et prise de risque.",
+            "Acte III - Les conséquences de ces choix déterminent la situation finale.",
+        ],
+    }
+
+    outcomes: list[StoryOutcome] = []
+    for agent in agent_list:
+        agent_id = str(agent.get("agent_id", "unknown"))
+        agent_decisions = by_agent.get(agent_id, {})
+        wealth = _initial_wealth(agent)
+        stability = 60.0
+        timeline = [f"Départ : patrimoine estimé à {wealth:,.0f} EUR et stabilité {stability:.0f}/100."]
+
+        accepts_protection = any(
+            decision.accepted
+            for name, decision in agent_decisions.items()
+            if any(term in name for term in (
+                "invest", "water", "housing", "higher_ground", "shelter", "stock", "food", "protect",
+            ))
+        )
+        accepts_work_change = any(
+            decision.accepted for name, decision in agent_decisions.items() if "work" in name or "employment" in name
+        )
+        accepts_migration = any(
+            decision.accepted for name, decision in agent_decisions.items() if "move" in name or "leave" in name
+        )
+
+        if scenario_kind == "apocalypse":
+            infrastructure_loss = wealth * 0.65
+            wealth -= infrastructure_loss
+            stability -= 58
+            timeline.append(
+                f"Effondrement : pertes matérielles de {infrastructure_loss:,.0f} EUR et rupture des services essentiels."
+            )
+            age = _as_float(agent.get("age", 0))
+            if age >= 70:
+                stability -= 20
+                timeline.append("Vulnérabilité accrue : l'âge rend l'accès aux ressources et aux soins plus difficile.")
+            if wealth < 5000:
+                stability -= 10
+                timeline.append("Réserves insuffisantes : l'agent ne peut pas absorber durablement la pénurie.")
+            if accepts_protection:
+                wealth -= min(3000, wealth * 0.25)
+                stability += 25
+                timeline.append("Branche protection : abri et réserves sécurisés, la stabilité remonte malgré le coût.")
+            else:
+                stability -= 12
+                timeline.append("Branche exposée : absence de protection, l'agent reste dépendant de ressources instables.")
+            if accepts_work_change:
+                wealth += 2500
+                stability += 10
+                timeline.append("Organisation locale : une activité utile procure ressources et soutien (+2,500 EUR).")
+            else:
+                stability -= 8
+                timeline.append("Aucune activité résiliente : les ressources continuent de diminuer.")
+        elif scenario_kind == "market_crash":
+            loss = wealth * 0.24
+            wealth -= loss
+            timeline.append(f"Choc boursier : perte initiale de {loss:,.0f} EUR.")
+            if accepts_protection:
+                recovery = wealth * 0.42
+                wealth += recovery
+                stability += 12
+                timeline.append(f"Branche investissement : des actifs dépréciés rapportent {recovery:,.0f} EUR à la reprise.")
+            else:
+                safety_cost = wealth * 0.04
+                wealth -= safety_cost
+                stability += 6
+                timeline.append(f"Branche prudente : protection de l'épargne, coût de {safety_cost:,.0f} EUR.")
+            if accepts_work_change:
+                wealth += 3500
+                stability += 8
+                timeline.append("Adaptation professionnelle : nouvelle source de revenus (+3,500 EUR).")
+            else:
+                stability -= 7
+                timeline.append("Emploi inchangé : les revenus restent fragiles pendant la crise.")
+        elif scenario_kind == "water_crisis":
+            wealth -= wealth * 0.12
+            stability -= 20
+            timeline.append("Pénurie d'eau : hausse des dépenses et baisse de stabilité.")
+            if accepts_protection:
+                wealth -= 1800
+                stability += 28
+                timeline.append("Résilience : investissement dans l'eau ou le logement (-1,800 EUR, stabilité renforcée).")
+            if accepts_migration:
+                wealth -= 2200
+                stability += 18
+                timeline.append("Migration : coût de déplacement (-2,200 EUR), exposition au risque réduite.")
+        else:
+            wealth -= wealth * 0.10
+            stability -= 12
+            timeline.append("Choc initial : les ressources et la stabilité diminuent.")
+            if accepts_protection or accepts_work_change or accepts_migration:
+                wealth += 2200
+                stability += 18
+                timeline.append("Adaptation : une décision proactive améliore la situation finale.")
+            else:
+                stability -= 10
+                timeline.append("Inaction : l'agent absorbe le choc sans levier d'adaptation.")
+
+        wealth = round(max(0.0, wealth), 2)
+        stability = round(max(0.0, min(100.0, stability)), 1)
+        survival_threshold = (1500, 25) if scenario_kind == "apocalypse" else (1000, 20)
+        survived = wealth >= survival_threshold[0] and stability >= survival_threshold[1]
+        timeline.append(
+            f"Fin : patrimoine {wealth:,.0f} EUR, stabilité {stability:.0f}/100, "
+            f"statut {'survit' if survived else 'en difficulté critique'}."
+        )
+        outcomes.append(StoryOutcome(agent_id, wealth, stability, survived, timeline))
+
+    ranking = sorted(outcomes, key=lambda outcome: (outcome.survived, outcome.wealth, outcome.stability), reverse=True)
+    survivor_count = sum(outcome.survived for outcome in outcomes)
+    return StorySimulation(
+        scenario_kind,
+        chapters_by_kind[scenario_kind],
+        outcomes,
+        ranking,
+        survivor_count,
+        len(outcomes) - survivor_count,
+    )

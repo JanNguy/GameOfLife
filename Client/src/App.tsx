@@ -14,7 +14,7 @@ const REMOTE_COMMANDS = ['run', 'clean', 'fclean', 'data', 'setup', 'model']
 const HELP_LINES: Line[] = [
   { text: 'available commands:', type: 'info' },
   { text: '  setup   — run the data pipeline', type: 'info' },
-  { text: '  run     — sample agents: run <nb_agent> <scenario>', type: 'info' },
+  { text: '  run     — run a scenario: run <nb_agent> <scenario>', type: 'info' },
   { text: '  data    — rerun the data pipeline', type: 'info' },
   { text: '  model   — show / select the prediction model', type: 'info' },
   { text: '  clean   — remove generated game files', type: 'info' },

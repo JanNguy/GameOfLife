@@ -72,6 +72,70 @@ DEFAULT_QUESTION_BANK = [
 ]
 
 
+MARKET_CRASH_QUESTION_BANK = [
+    {
+        "id": "investment",
+        "question": "L'agent doit-il investir dans des actifs fortement dépréciés ?",
+        "domain": "finance",
+        "type": "binary",
+        "description": "Décision de prendre un risque financier pendant le crash boursier.",
+    },
+    {
+        "id": "employment",
+        "question": "L'agent doit-il chercher un travail ou une activité plus résiliente ?",
+        "domain": "employment",
+        "type": "binary",
+        "description": "Décision d'adapter ses revenus face au ralentissement économique.",
+    },
+    {
+        "id": "housing",
+        "question": "L'agent doit-il conserver son logement malgré la baisse des prix ?",
+        "domain": "housing",
+        "type": "binary",
+        "description": "Décision de stabiliser son logement pendant la crise financière.",
+    },
+    {
+        "id": "stay_or_leave",
+        "question": "L'agent doit-il rester dans son secteur économique actuel ?",
+        "domain": "employment",
+        "type": "binary",
+        "description": "Décision de rester ou de se réorienter après le crash.",
+    },
+]
+
+
+APOCALYPSE_QUESTION_BANK = [
+    {
+        "id": "build_shelter",
+        "question": "L'agent doit-il consacrer ses ressources à un abri autonome ?",
+        "domain": "survival",
+        "type": "binary",
+        "description": "Décision de sécuriser un refuge face à l'effondrement des infrastructures.",
+    },
+    {
+        "id": "stock_resources",
+        "question": "L'agent doit-il constituer des réserves de nourriture, d'eau et de soins ?",
+        "domain": "survival",
+        "type": "binary",
+        "description": "Décision de réduire la dépendance aux ressources devenues rares.",
+    },
+    {
+        "id": "employment",
+        "question": "L'agent doit-il rejoindre une activité locale indispensable à la survie ?",
+        "domain": "employment",
+        "type": "binary",
+        "description": "Décision de contribuer à une économie locale de crise.",
+    },
+    {
+        "id": "move_to_higher_ground",
+        "question": "L'agent doit-il quitter sa zone pour rejoindre un refuge plus sûr ?",
+        "domain": "migration",
+        "type": "binary",
+        "description": "Décision de se déplacer malgré les risques du trajet.",
+    },
+]
+
+
 def _ensure_question_shape(question: dict[str, Any]) -> dict[str, Any]:
     question = dict(question)
     question.setdefault("id", f"binary_question_{len(question)}")
@@ -89,7 +153,11 @@ def generate_questions_for_context(context: str, max_questions: int = 5) -> list
     normalized = (context or "").lower()
     selected: list[dict[str, Any]] = []
 
-    if "eau" in normalized or "water" in normalized or "inond" in normalized or "pluie" in normalized:
+    if any(term in normalized for term in ("fin du monde", "apocalypse", "nuclé", "nucle", "météor", "meteor", "extinction", "zombie")):
+        relevant = APOCALYPSE_QUESTION_BANK
+    elif any(term in normalized for term in ("bours", "krach", "crash", "marché", "marche financier", "finance")):
+        relevant = MARKET_CRASH_QUESTION_BANK
+    elif "eau" in normalized or "water" in normalized or "inond" in normalized or "pluie" in normalized:
         relevant = [
             q for q in DEFAULT_QUESTION_BANK if q["domain"] in {"migration", "resource_management", "housing"}
         ]

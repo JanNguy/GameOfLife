@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from game.decision_engine import simulate_round, supervisor_summary
+from game.decision_engine import simulate_story
 from game.scenario_orchestrator import call_orchestrator_llm, generate_questions_for_context
 
 app = FastAPI()
@@ -133,29 +133,37 @@ async def scenario_run(payload: dict[str, Any]):
     scenario = str(payload.get("scenario", "simulation default"))
     questions = call_orchestrator_llm(scenario, max_questions=int(payload.get("max_questions", 5)))
 
-    decisions, summary = simulate_round(agents, decision_names=[q["id"] for q in questions if q.get("type") == "binary"] or ["employment", "housing", "relationship", "investment"])
+    story = simulate_story(agents, scenario, questions)
 
     result = {
         "scenario": scenario,
         "questions": questions,
-        "summary": {
-            "total_agents": summary.total_agents,
-            "decisions": summary.decisions,
-            "acceptance_rate": summary.acceptance_rate,
-            "supervisor_note": summary.supervisor_note,
+        "story": {
+            "kind": story.scenario_kind,
+            "chapters": story.chapters,
+            "survivor_count": story.survivor_count,
+            "casualty_count": story.casualty_count,
+            "outcomes": [
+                {
+                    "agent_id": outcome.agent_id,
+                    "wealth": outcome.wealth,
+                    "stability": outcome.stability,
+                    "survived": outcome.survived,
+                    "timeline": outcome.timeline,
+                }
+                for outcome in story.outcomes
+            ],
+            "ranking": [
+                {
+                    "position": position,
+                    "agent_id": outcome.agent_id,
+                    "wealth": outcome.wealth,
+                    "stability": outcome.stability,
+                    "survived": outcome.survived,
+                }
+                for position, outcome in enumerate(story.ranking, start=1)
+            ],
         },
-        "supervisor_summary": supervisor_summary(decisions),
-        "decisions": [
-            {
-                "agent_id": d.agent_id,
-                "decision": d.decision,
-                "accepted": d.accepted,
-                "probability": d.probability,
-                "confidence": d.confidence,
-                "reasons": d.reasons,
-            }
-            for d in decisions
-        ],
     }
     return JSONResponse(result)
 

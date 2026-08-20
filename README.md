@@ -59,7 +59,10 @@ Elle effectue les opérations suivantes :
 1. Échantillonne les agents depuis `data_part/out/out_profiles.csv`.
 2. Propose des questions de décision binaires adaptées au scénario.
 3. Évalue chaque question pour chaque agent avec le moteur de décision.
-4. Affiche les décisions et le taux global d'acceptation.
+4. Déroule une histoire en trois actes et conserve une branche narrative par agent.
+5. Classe les agents par survie, patrimoine final et stabilité.
+
+Par exemple, pour un crash boursier, les agents perdent d'abord une part de leur patrimoine. Les agents qui investissent pendant la baisse et adaptent leur travail peuvent récupérer davantage à la reprise ; le classement final affiche alors les patrimoines restants et le statut de survie. Pour une apocalypse (`fin du monde`, `catastrophe nucléaire`, `météorite`, etc.), les ressources et la stabilité sont fortement diminuées : les agents sans abri, réserves ou activité résiliente peuvent disparaître. Le bilan final indique le nombre de survivants et de disparus.
 
 Le fichier généré `game/agents.json` est un artefact local ignoré par Git.
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from scenario_orchestrator import call_orchestrator_llm
-from decision_engine import simulate_round, supervisor_summary
+from decision_engine import simulate_story
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -62,11 +62,22 @@ if __name__ == "__main__":
     for q in questions:
         print(f"  - {q['id']}: {q['question']}")
 
-    decision_ids = [q["id"] for q in questions if q.get("type") == "binary"]
-    if not decision_ids:
-        decision_ids = ["employment", "housing", "relationship", "investment"]
+    story = simulate_story(agents, args.scenario, questions)
+    print("\nHistoire de la simulation:")
+    for chapter in story.chapters:
+        print(f"  {chapter}")
 
-    decisions, summary = simulate_round(agents, decision_names=decision_ids)
-    print("\nSynthèse superviseur:")
-    print(supervisor_summary(decisions))
-    print(f"\nTaux global d'acceptation: {summary.acceptance_rate:.2%}")
+    print("\nTrajectoires des agents:")
+    for outcome in story.outcomes:
+        print(f"\n  {outcome.agent_id}")
+        for event in outcome.timeline:
+            print(f"    - {event}")
+
+    print("\nClassement final:")
+    for position, outcome in enumerate(story.ranking, start=1):
+        status = "survit" if outcome.survived else "en difficulté critique"
+        print(
+            f"  {position}. {outcome.agent_id} | {outcome.wealth:,.0f} EUR | "
+            f"stabilité {outcome.stability:.0f}/100 | {status}"
+        )
+    print(f"\nBilan : {story.survivor_count} survivant(s), {story.casualty_count} disparition(s).")
